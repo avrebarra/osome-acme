@@ -15,6 +15,7 @@ const config = process.env.NODE_ENV === 'test' ? testConfig : devConfig;
   imports: [
     SequelizeModule.forRoot({
       ...config,
+      logging: process.env.NODE_ENV === 'test' ? false : console.log,
       models: [Company, User, Ticket],
     }),
   ],

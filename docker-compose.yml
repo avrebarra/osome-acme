@@ -1,9 +1,7 @@
-version: '3'
-
 services:
   postgres:
     container_name: interview_task_postgres
-    image: postgres:12.3
+    image: postgres:13
     ports:
       - 5590:5432
     environment:
