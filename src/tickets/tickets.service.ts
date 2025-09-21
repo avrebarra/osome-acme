@@ -6,6 +6,10 @@ import {
   TicketType,
 } from '../../db/models/Ticket';
 import { User, UserRole } from '../../db/models/User';
+import {
+  NoAssigneeFoundException,
+  MultipleAssigneesFoundException,
+} from './exceptions/ticket.exceptions';
 
 export interface TicketDto {
   id: number;
@@ -30,9 +34,7 @@ export class TicketsService {
 
     // throw error if no assignees found
     if (!assignees.length)
-      throw new Error(
-        `Cannot find user with role ${userRole} to create a ticket`,
-      );
+      throw new NoAssigneeFoundException(userRole, companyId);
 
     // select the first assignee (most recently created)
     const assignee = assignees[0];
@@ -71,15 +73,11 @@ export class TicketsService {
 
     // throw error if no assignees found
     if (!assignees.length)
-      throw new Error(
-        `Cannot find user with role ${userRole} to create a ticket`,
-      );
+      throw new NoAssigneeFoundException(userRole, companyId);
 
     // throw error if multiple corporate secretaries found
     if (assignees.length > 1)
-      throw new Error(
-        `Multiple users with role ${userRole}. Cannot create a ticket`,
-      );
+      throw new MultipleAssigneesFoundException(userRole, assignees.length);
 
     // select the first (and only) assignee
     const assignee = assignees[0];

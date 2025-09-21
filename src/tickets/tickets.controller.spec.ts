@@ -1,4 +1,3 @@
-import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   TicketCategory,
@@ -7,6 +6,7 @@ import {
 } from '../../db/models/Ticket';
 import { TicketsController } from './tickets.controller';
 import { TicketsService, TicketDto } from './tickets.service';
+import { UnknownTicketTypeException } from './exceptions/ticket.exceptions';
 
 describe('TicketsController', () => {
   let controller: TicketsController;
@@ -99,7 +99,7 @@ describe('TicketsController', () => {
     describe('unknown ticket type', () => {
       it('returns conflict error for unknown ticket type', async () => {
         const companyId = 1;
-        let thrownError: ConflictException | null = null;
+        let thrownError: UnknownTicketTypeException | null = null;
 
         try {
           await controller.create({
@@ -107,10 +107,10 @@ describe('TicketsController', () => {
             type: 'unknownType' as TicketType,
           });
         } catch (error) {
-          thrownError = error as ConflictException;
+          thrownError = error as UnknownTicketTypeException;
         }
 
-        expect(thrownError).toBeInstanceOf(ConflictException);
+        expect(thrownError).toBeInstanceOf(UnknownTicketTypeException);
         expect(thrownError?.message).toBe('Unknown ticket type: unknownType');
         expect(
           mockTicketsService.handleTicketManagementReport,

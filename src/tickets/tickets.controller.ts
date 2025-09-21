@@ -1,4 +1,4 @@
-import { Body, ConflictException, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { Company } from '../../db/models/Company';
 import {
   Ticket,
@@ -8,6 +8,7 @@ import {
 } from '../../db/models/Ticket';
 import { User } from '../../db/models/User';
 import { TicketsService } from './tickets.service';
+import { UnknownTicketTypeException } from './exceptions/ticket.exceptions';
 
 interface newTicketDto {
   type: TicketType;
@@ -51,7 +52,7 @@ export class TicketsController {
         break;
 
       default:
-        throw new ConflictException(`Unknown ticket type: ${type as string}`);
+        throw new UnknownTicketTypeException(type as string);
     }
 
     return ticket;
