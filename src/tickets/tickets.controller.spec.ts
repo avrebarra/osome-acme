@@ -9,6 +9,7 @@ import {
 import { User, UserRole } from '../../db/models/User';
 import { DbModule } from '../db.module';
 import { TicketsController } from './tickets.controller';
+import { TicketsService } from './tickets.service';
 
 describe('TicketsController', () => {
   let controller: TicketsController;
@@ -16,17 +17,17 @@ describe('TicketsController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TicketsController],
+      providers: [TicketsService],
       imports: [DbModule],
     }).compile();
 
     controller = module.get<TicketsController>(TicketsController);
   });
 
-  it('should be defined', async () => {
+  it('should be defined', () => {
     expect(controller).toBeDefined();
-
-    const res = await controller.findAll();
-    console.log(res);
+    // const res = await controller.findAll();
+    // console.log(res);
   });
 
   describe('create', () => {
