@@ -1,150 +1,123 @@
-import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Company } from '../../db/models/Company';
 import {
   TicketCategory,
   TicketStatus,
   TicketType,
 } from '../../db/models/Ticket';
-import { User, UserRole } from '../../db/models/User';
-import { DbModule } from '../db.module';
 import { TicketsController } from './tickets.controller';
+import { TicketsService, TicketDto } from './tickets.service';
+import { UnknownTicketTypeException } from './exceptions/ticket.exceptions';
 
 describe('TicketsController', () => {
   let controller: TicketsController;
 
+  const mockTicketsService = {
+    handleTicketManagementReport: jest.fn(),
+    handleTicketRegistrationAddressChange: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TicketsController],
-      imports: [DbModule],
+      providers: [
+        {
+          provide: TicketsService,
+          useValue: mockTicketsService,
+        },
+      ],
     }).compile();
 
     controller = module.get<TicketsController>(TicketsController);
-  });
 
-  it('should be defined', async () => {
-    expect(controller).toBeDefined();
-
-    const res = await controller.findAll();
-    console.log(res);
+    // Clear all mocks before each test
+    jest.clearAllMocks();
   });
 
   describe('create', () => {
     describe('managementReport', () => {
-      it('creates managementReport ticket', async () => {
-        const company = await Company.create({ name: 'test' });
-        const user = await User.create({
-          name: 'Test User',
-          role: UserRole.accountant,
-          companyId: company.id,
-        });
-
-        const ticket = await controller.create({
-          companyId: company.id,
+      it('returns ok when creating management report ticket', async () => {
+        const companyId = 1;
+        const expectedTicket: TicketDto = {
+          id: 1,
           type: TicketType.managementReport,
-        });
+          companyId,
+          assigneeId: 1,
+          status: TicketStatus.open,
+          category: TicketCategory.accounting,
+        };
 
-        expect(ticket.category).toBe(TicketCategory.accounting);
-        expect(ticket.assigneeId).toBe(user.id);
-        expect(ticket.status).toBe(TicketStatus.open);
-      });
-
-      it('if there are multiple accountants, assign the last one', async () => {
-        const company = await Company.create({ name: 'test' });
-        await User.create({
-          name: 'Test User',
-          role: UserRole.accountant,
-          companyId: company.id,
-        });
-        const user2 = await User.create({
-          name: 'Test User',
-          role: UserRole.accountant,
-          companyId: company.id,
-        });
-
-        const ticket = await controller.create({
-          companyId: company.id,
-          type: TicketType.managementReport,
-        });
-
-        expect(ticket.category).toBe(TicketCategory.accounting);
-        expect(ticket.assigneeId).toBe(user2.id);
-        expect(ticket.status).toBe(TicketStatus.open);
-      });
-
-      it('if there is no accountant, throw', async () => {
-        const company = await Company.create({ name: 'test' });
-
-        await expect(
-          controller.create({
-            companyId: company.id,
-            type: TicketType.managementReport,
-          }),
-        ).rejects.toEqual(
-          new ConflictException(
-            `Cannot find user with role accountant to create a ticket`,
-          ),
+        mockTicketsService.handleTicketManagementReport.mockResolvedValue(
+          expectedTicket,
         );
+
+        const result = await controller.create({
+          companyId,
+          type: TicketType.managementReport,
+        });
+
+        expect(
+          mockTicketsService.handleTicketManagementReport,
+        ).toHaveBeenCalledWith(companyId);
+        expect(result).toBeDefined();
+        expect(result.id).toBe(expectedTicket.id);
+        expect(result.type).toBe(TicketType.managementReport);
+        expect(result.status).toBe(TicketStatus.open);
       });
     });
 
     describe('registrationAddressChange', () => {
-      it('creates registrationAddressChange ticket', async () => {
-        const company = await Company.create({ name: 'test' });
-        const user = await User.create({
-          name: 'Test User',
-          role: UserRole.corporateSecretary,
-          companyId: company.id,
-        });
+      it('returns ok when creating registration address change ticket', async () => {
+        const companyId = 1;
+        const expectedTicket: TicketDto = {
+          id: 1,
+          type: TicketType.registrationAddressChange,
+          companyId,
+          assigneeId: 1,
+          status: TicketStatus.open,
+          category: TicketCategory.corporate,
+        };
 
-        const ticket = await controller.create({
-          companyId: company.id,
+        mockTicketsService.handleTicketRegistrationAddressChange.mockResolvedValue(
+          expectedTicket,
+        );
+
+        const result = await controller.create({
+          companyId,
           type: TicketType.registrationAddressChange,
         });
 
-        expect(ticket.category).toBe(TicketCategory.corporate);
-        expect(ticket.assigneeId).toBe(user.id);
-        expect(ticket.status).toBe(TicketStatus.open);
+        expect(
+          mockTicketsService.handleTicketRegistrationAddressChange,
+        ).toHaveBeenCalledWith(companyId);
+        expect(result).toBeDefined();
+        expect(result.id).toBe(expectedTicket.id);
+        expect(result.type).toBe(TicketType.registrationAddressChange);
+        expect(result.status).toBe(TicketStatus.open);
       });
+    });
 
-      it('if there are multiple secretaries, throw', async () => {
-        const company = await Company.create({ name: 'test' });
-        await User.create({
-          name: 'Test User',
-          role: UserRole.corporateSecretary,
-          companyId: company.id,
-        });
-        await User.create({
-          name: 'Test User',
-          role: UserRole.corporateSecretary,
-          companyId: company.id,
-        });
+    describe('unknown ticket type', () => {
+      it('returns conflict error for unknown ticket type', async () => {
+        const companyId = 1;
+        let thrownError: UnknownTicketTypeException | null = null;
 
-        await expect(
-          controller.create({
-            companyId: company.id,
-            type: TicketType.registrationAddressChange,
-          }),
-        ).rejects.toEqual(
-          new ConflictException(
-            `Multiple users with role corporateSecretary. Cannot create a ticket`,
-          ),
-        );
-      });
+        try {
+          await controller.create({
+            companyId,
+            type: 'unknownType' as TicketType,
+          });
+        } catch (error) {
+          thrownError = error as UnknownTicketTypeException;
+        }
 
-      it('if there is no secretary, throw', async () => {
-        const company = await Company.create({ name: 'test' });
-
-        await expect(
-          controller.create({
-            companyId: company.id,
-            type: TicketType.registrationAddressChange,
-          }),
-        ).rejects.toEqual(
-          new ConflictException(
-            `Cannot find user with role corporateSecretary to create a ticket`,
-          ),
-        );
+        expect(thrownError).toBeInstanceOf(UnknownTicketTypeException);
+        expect(thrownError?.message).toBe('Unknown ticket type: unknownType');
+        expect(
+          mockTicketsService.handleTicketManagementReport,
+        ).not.toHaveBeenCalled();
+        expect(
+          mockTicketsService.handleTicketRegistrationAddressChange,
+        ).not.toHaveBeenCalled();
       });
     });
   });

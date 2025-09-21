@@ -1,0 +1,133 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { Company } from '../../db/models/Company';
+import {
+  TicketCategory,
+  TicketStatus,
+  TicketType,
+} from '../../db/models/Ticket';
+import { User, UserRole } from '../../db/models/User';
+import { DbModule } from '../db.module';
+import { TicketsService } from './tickets.service';
+
+describe('TicketsService', () => {
+  let service: TicketsService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [TicketsService],
+      imports: [DbModule],
+    }).compile();
+
+    service = module.get<TicketsService>(TicketsService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+
+  describe('handleManagementReport', () => {
+    it('creates managementReport ticket', async () => {
+      const company = await Company.create({ name: 'test' });
+      const user = await User.create({
+        name: 'Test User',
+        role: UserRole.accountant,
+        companyId: company.id,
+      });
+
+      const ticket = await service.handleTicketManagementReport(company.id);
+
+      expect(ticket.category).toBe(TicketCategory.accounting);
+      expect(ticket.assigneeId).toBe(user.id);
+      expect(ticket.status).toBe(TicketStatus.open);
+      expect(ticket.type).toBe(TicketType.managementReport);
+      expect(ticket.companyId).toBe(company.id);
+    });
+
+    it('if there are multiple accountants, assign the last one', async () => {
+      const company = await Company.create({ name: 'test' });
+      await User.create({
+        name: 'Test User',
+        role: UserRole.accountant,
+        companyId: company.id,
+      });
+      const user2 = await User.create({
+        name: 'Test User 2',
+        role: UserRole.accountant,
+        companyId: company.id,
+      });
+
+      const ticket = await service.handleTicketManagementReport(company.id);
+
+      expect(ticket.category).toBe(TicketCategory.accounting);
+      expect(ticket.assigneeId).toBe(user2.id);
+      expect(ticket.status).toBe(TicketStatus.open);
+      expect(ticket.type).toBe(TicketType.managementReport);
+      expect(ticket.companyId).toBe(company.id);
+    });
+
+    it('if there is no accountant, throw', async () => {
+      const company = await Company.create({ name: 'test' });
+
+      await expect(
+        service.handleTicketManagementReport(company.id),
+      ).rejects.toEqual(
+        new Error(`Cannot find user with role accountant to create a ticket`),
+      );
+    });
+  });
+
+  describe('handleRegistrationAddressChange', () => {
+    it('creates registrationAddressChange ticket', async () => {
+      const company = await Company.create({ name: 'test' });
+      const user = await User.create({
+        name: 'Test User',
+        role: UserRole.corporateSecretary,
+        companyId: company.id,
+      });
+
+      const ticket = await service.handleTicketRegistrationAddressChange(
+        company.id,
+      );
+
+      expect(ticket.category).toBe(TicketCategory.corporate);
+      expect(ticket.assigneeId).toBe(user.id);
+      expect(ticket.status).toBe(TicketStatus.open);
+      expect(ticket.type).toBe(TicketType.registrationAddressChange);
+      expect(ticket.companyId).toBe(company.id);
+    });
+
+    it('if there are multiple secretaries, throw', async () => {
+      const company = await Company.create({ name: 'test' });
+      await User.create({
+        name: 'Test User',
+        role: UserRole.corporateSecretary,
+        companyId: company.id,
+      });
+      await User.create({
+        name: 'Test User 2',
+        role: UserRole.corporateSecretary,
+        companyId: company.id,
+      });
+
+      await expect(
+        service.handleTicketRegistrationAddressChange(company.id),
+      ).rejects.toEqual(
+        new Error(
+          `Multiple users with role corporateSecretary. Cannot create a ticket`,
+        ),
+      );
+    });
+
+    it('if there is no secretary, throw', async () => {
+      const company = await Company.create({ name: 'test' });
+
+      await expect(
+        service.handleTicketRegistrationAddressChange(company.id),
+      ).rejects.toEqual(
+        new Error(
+          `Cannot find user with role corporateSecretary to create a ticket`,
+        ),
+      );
+    });
+  });
+});
