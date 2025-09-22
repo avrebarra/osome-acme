@@ -125,7 +125,47 @@ export class TicketsService {
     };
   }
 
-  async handleTicketStrikeOff(companyId: number): Promise<TicketDto | null> {
-    return null;
+  async handleTicketStrikeOff(companyId: number): Promise<TicketDto> {
+    // fetch all required data
+    const [directors] = await Promise.all([
+      User.findAll({
+        where: { companyId, role: UserRole.director },
+        order: [['createdAt', 'DESC']],
+        limit: 2, // limit to 2 users
+      }),
+    ]);
+    if (!directors.length) {
+      throw new NoAssigneeFoundException(UserRole.director);
+    }
+    if (directors.length > 1) {
+      // if more than one assignee found then there is a role conflict
+      throw new RoleConflictException(UserRole.director);
+    }
+
+    // select assignee
+    const assignee = directors[0];
+    const ticket = await Ticket.create({
+      companyId,
+      assigneeId: assignee.id,
+      category: TicketCategory.management,
+      type: TicketType.strikeOff,
+      status: TicketStatus.open,
+    });
+
+    // perform side effects: set all open tickets as resolved
+    await Ticket.update(
+      { status: TicketStatus.resolved },
+      { where: { companyId, status: TicketStatus.open } },
+    );
+
+    // build and return the ticket
+    return {
+      id: ticket.id,
+      type: ticket.type,
+      assigneeId: ticket.assigneeId,
+      status: ticket.status,
+      category: ticket.category,
+      companyId: ticket.companyId,
+    };
   }
 }
