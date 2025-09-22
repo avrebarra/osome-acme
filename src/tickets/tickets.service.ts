@@ -124,4 +124,8 @@ export class TicketsService {
       companyId: ticket.companyId,
     };
   }
+
+  async handleTicketStrikeOff(companyId: number): Promise<TicketDto | null> {
+    return null;
+  }
 }

@@ -51,6 +51,10 @@ export class TicketsController {
           );
         break;
 
+      case TicketType.strikeOff:
+        ticket = await this.ticketService.handleTicketStrikeOff(companyId);
+        break;
+
       default:
         throw new UnknownTicketTypeException(type as string);
     }
