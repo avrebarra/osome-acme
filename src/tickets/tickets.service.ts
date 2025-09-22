@@ -33,8 +33,7 @@ export class TicketsService {
     });
 
     // throw error if no assignees found
-    if (!assignees.length)
-      throw new NoAssigneeFoundException(userRole, companyId);
+    if (!assignees.length) throw new NoAssigneeFoundException(userRole);
 
     // select the first assignee (most recently created)
     const assignee = assignees[0];
@@ -70,14 +69,13 @@ export class TicketsService {
       where: { companyId, role: userRole },
       order: [['createdAt', 'DESC']],
     });
-
-    // throw error if no assignees found
-    if (!assignees.length)
-      throw new NoAssigneeFoundException(userRole, companyId);
-
-    // throw error if multiple corporate secretaries found
-    if (assignees.length > 1)
-      throw new MultipleAssigneesFoundException(userRole, assignees.length);
+    if (!assignees.length) {
+      throw new NoAssigneeFoundException(userRole);
+    }
+    if (assignees.length > 1) {
+      // throw error if multiple assignees found
+      throw new MultipleAssigneesFoundException(userRole);
+    }
 
     // select the first (and only) assignee
     const assignee = assignees[0];
