@@ -2,20 +2,30 @@ import { HttpStatus } from '@nestjs/common';
 import { ServiceException } from '../../lib/exceptions';
 
 export class NoAssigneeFoundException extends ServiceException {
-  constructor(role: string) {
+  constructor(roleType: string) {
     const data = {
       error: 'NO_ASSIGNEE_FOUND',
-      message: `Cannot find user with role ${role} to create a ticket`,
+      message: `Cannot find user with role ${roleType} to create a ticket`,
     };
     super(data, HttpStatus.BAD_REQUEST);
   }
 }
 
-export class MultipleAssigneesFoundException extends ServiceException {
-  constructor(role: string) {
+export class TicketAlreadyExistsException extends ServiceException {
+  constructor(ticketType: string) {
     const data = {
-      error: 'MULTIPLE_ASSIGNEES_FOUND',
-      message: `Multiple users with role ${role}. Cannot create a ticket`,
+      error: 'TICKET_ALREADY_EXISTS',
+      message: `Ticket of type ${ticketType} already exists`,
+    };
+    super(data, HttpStatus.CONFLICT);
+  }
+}
+
+export class RoleConflictException extends ServiceException {
+  constructor(roleType: string) {
+    const data = {
+      error: 'ROLE_CONFLICT',
+      message: `Users with conflicting role (${roleType}) found`,
     };
     super(data, HttpStatus.CONFLICT);
   }

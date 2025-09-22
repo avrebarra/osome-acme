@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Company } from '../../db/models/Company';
 import {
+  Ticket,
   TicketCategory,
   TicketStatus,
   TicketType,
@@ -96,6 +97,21 @@ describe('TicketsService', () => {
       expect(ticket.companyId).toBe(company.id);
     });
 
+    it('if there is already a registrationAddressChange ticket, throw', async () => {
+      const company = await Company.create({ name: 'test' });
+
+      await Ticket.create({
+        type: TicketType.registrationAddressChange,
+        companyId: company.id,
+      });
+
+      await expect(
+        service.handleTicketRegistrationAddressChange(company.id),
+      ).rejects.toThrow(
+        'Ticket of type registrationAddressChange already exists',
+      );
+    });
+
     it('if there are multiple secretaries, throw', async () => {
       const company = await Company.create({ name: 'test' });
       await User.create({
@@ -111,10 +127,8 @@ describe('TicketsService', () => {
 
       await expect(
         service.handleTicketRegistrationAddressChange(company.id),
-      ).rejects.toEqual(
-        new Error(
-          `Multiple users with role corporateSecretary. Cannot create a ticket`,
-        ),
+      ).rejects.toThrow(
+        'Users with conflicting role (corporateSecretary) found',
       );
     });
 
@@ -123,10 +137,8 @@ describe('TicketsService', () => {
 
       await expect(
         service.handleTicketRegistrationAddressChange(company.id),
-      ).rejects.toEqual(
-        new Error(
-          `Cannot find user with role corporateSecretary to create a ticket`,
-        ),
+      ).rejects.toThrow(
+        `Cannot find user with role director to create a ticket`,
       );
     });
   });
