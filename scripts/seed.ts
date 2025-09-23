@@ -27,9 +27,7 @@ async function main() {
         { name: 'Alice Accountant', role: UserRole.accountant },
         { name: 'Bob Accountant', role: UserRole.accountant },
         { name: 'Charlie Secretary', role: UserRole.corporateSecretary },
-        { name: 'Dana Secretary', role: UserRole.corporateSecretary },
         { name: 'Eve Director', role: 'director' }, // Add director role if not in enum
-        { name: 'Frank Director', role: 'director' },
       ];
 
       for (const user of users) {
