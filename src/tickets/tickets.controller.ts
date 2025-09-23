@@ -8,7 +8,7 @@ import {
 } from '../../db/models/Ticket';
 import { User } from '../../db/models/User';
 import { TicketsService } from './tickets.service';
-import { UnknownTicketTypeException } from './exceptions/ticket.exceptions';
+import { UnknownTicketTypeException } from './exceptions';
 
 interface newTicketDto {
   type: TicketType;

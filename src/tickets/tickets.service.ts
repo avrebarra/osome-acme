@@ -10,7 +10,7 @@ import {
   NoAssigneeFoundException,
   RoleConflictException,
   TicketAlreadyExistsException,
-} from './exceptions/ticket.exceptions';
+} from './exceptions';
 
 export interface TicketDto {
   id: number;

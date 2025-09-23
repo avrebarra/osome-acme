@@ -6,7 +6,7 @@ import {
 } from '../../db/models/Ticket';
 import { TicketsController } from './tickets.controller';
 import { TicketsService, TicketDto } from './tickets.service';
-import { UnknownTicketTypeException } from './exceptions/ticket.exceptions';
+import { UnknownTicketTypeException } from './exceptions';
 
 describe('TicketsController', () => {
   let controller: TicketsController;

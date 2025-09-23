@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { ServiceException } from '../../lib/exceptions';
+import { ServiceException } from '../lib/exceptions';
 
 export class NoAssigneeFoundException extends ServiceException {
   constructor(roleType: string) {
