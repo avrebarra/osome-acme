@@ -77,6 +77,63 @@ describe('TicketsService', () => {
     });
   });
 
+  describe('handleTicketStrikeOff', () => {
+    it('creates strikeOff ticket and resolves open tickets', async () => {
+      const company = await Company.create({ name: 'test-strikeoff' });
+      const director = await User.create({
+        name: 'Director',
+        role: UserRole.director,
+        companyId: company.id,
+      });
+      // Create an open ticket to be resolved
+      const openTicket = await Ticket.create({
+        companyId: company.id,
+        status: TicketStatus.open,
+        type: TicketType.managementReport,
+        category: TicketCategory.accounting,
+        assigneeId: director.id,
+      });
+      const ticket = await service.handleTicketStrikeOff(company.id);
+      expect(ticket).not.toBeNull();
+      expect(ticket?.category).toBe(TicketCategory.management);
+      expect(ticket?.assigneeId).toBe(director.id);
+      expect(ticket?.status).toBe(TicketStatus.open);
+      expect(ticket?.type).toBe(TicketType.strikeOff);
+      expect(ticket?.companyId).toBe(company.id);
+      // Check that previous open ticket is resolved
+      const updated = await Ticket.findByPk(openTicket.id);
+      expect(updated?.status).toBe(TicketStatus.resolved);
+    });
+
+    it('throws if no director exists', async () => {
+      const company = await Company.create({
+        name: 'test-strikeoff-nodirector',
+      });
+      await expect(service.handleTicketStrikeOff(company.id)).rejects.toThrow(
+        'Cannot find user with role director to create a ticket',
+      );
+    });
+
+    it('throws if multiple directors exist', async () => {
+      const company = await Company.create({
+        name: 'test-strikeoff-multidirector',
+      });
+      await User.create({
+        name: 'Director 1',
+        role: UserRole.director,
+        companyId: company.id,
+      });
+      await User.create({
+        name: 'Director 2',
+        role: UserRole.director,
+        companyId: company.id,
+      });
+      await expect(service.handleTicketStrikeOff(company.id)).rejects.toThrow(
+        'Users with conflicting role (director) found',
+      );
+    });
+  });
+
   describe('handleRegistrationAddressChange', () => {
     it('creates registrationAddressChange ticket', async () => {
       const company = await Company.create({ name: 'test' });
