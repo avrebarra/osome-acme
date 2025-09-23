@@ -17,9 +17,9 @@ export class ReportsController {
   @Post()
   @HttpCode(201)
   generate() {
-    this.reportsService.accounts();
-    this.reportsService.yearly();
-    this.reportsService.fs();
+    this.reportsService.generateReportAccounts();
+    this.reportsService.generateReportYearly();
+    this.reportsService.generateReportFinancialStatements();
     return { message: 'finished' };
   }
 }

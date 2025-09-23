@@ -15,7 +15,7 @@ export class ReportsService {
     return this.states[scope];
   }
 
-  accounts() {
+  generateReportAccounts() {
     this.states.accounts = 'starting';
     const start = performance.now();
     const tmpDir = 'tmp';
@@ -45,7 +45,7 @@ export class ReportsService {
     this.states.accounts = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
-  yearly() {
+  generateReportYearly() {
     this.states.yearly = 'starting';
     const start = performance.now();
     const tmpDir = 'tmp';
@@ -80,7 +80,7 @@ export class ReportsService {
     this.states.yearly = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
-  fs() {
+  generateReportFinancialStatements() {
     this.states.fs = 'starting';
     const start = performance.now();
     const tmpDir = 'tmp';
