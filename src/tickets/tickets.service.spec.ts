@@ -85,7 +85,8 @@ describe('TicketsService', () => {
         role: UserRole.director,
         companyId: company.id,
       });
-      // Create an open ticket to be resolved
+
+      // reate an open ticket to be resolved
       const openTicket = await Ticket.create({
         companyId: company.id,
         status: TicketStatus.open,
@@ -93,6 +94,7 @@ describe('TicketsService', () => {
         category: TicketCategory.accounting,
         assigneeId: director.id,
       });
+
       const ticket = await service.handleTicketStrikeOff(company.id);
       expect(ticket).not.toBeNull();
       expect(ticket?.category).toBe(TicketCategory.management);
@@ -100,6 +102,7 @@ describe('TicketsService', () => {
       expect(ticket?.status).toBe(TicketStatus.open);
       expect(ticket?.type).toBe(TicketType.strikeOff);
       expect(ticket?.companyId).toBe(company.id);
+
       // Check that previous open ticket is resolved
       const updated = await Ticket.findByPk(openTicket.id);
       expect(updated?.status).toBe(TicketStatus.resolved);

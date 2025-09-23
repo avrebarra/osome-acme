@@ -11,6 +11,7 @@ import {
   RoleConflictException,
   TicketAlreadyExistsException,
 } from './exceptions';
+import { Op } from 'sequelize';
 
 export interface TicketDto {
   id: number;
@@ -155,7 +156,12 @@ export class TicketsService {
     // perform side effects: set all open tickets as resolved
     await Ticket.update(
       { status: TicketStatus.resolved },
-      { where: { companyId, status: TicketStatus.open } },
+      {
+        where: {
+          companyId,
+          id: { [Op.ne]: ticket.id },
+        },
+      },
     );
 
     // build and return the ticket
