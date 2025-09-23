@@ -1,7 +1,49 @@
 import { Injectable } from '@nestjs/common';
+
 import fs from 'fs';
 import path from 'path';
 import { performance } from 'perf_hooks';
+
+// Shared constants for report generation
+const REPORT_CONSTANTS = {
+  outputDir: 'tmp',
+  outputFiles: {
+    accounts: 'out/accounts.csv',
+    yearly: 'out/yearly.csv',
+    fs: 'out/fs.csv',
+  },
+  categories: {
+    'Income Statement': {
+      Revenues: ['Sales Revenue'],
+      Expenses: [
+        'Cost of Goods Sold',
+        'Salaries Expense',
+        'Rent Expense',
+        'Utilities Expense',
+        'Interest Expense',
+        'Tax Expense',
+      ],
+    },
+    'Balance Sheet': {
+      Assets: [
+        'Cash',
+        'Accounts Receivable',
+        'Inventory',
+        'Fixed Assets',
+        'Prepaid Expenses',
+      ],
+      Liabilities: [
+        'Accounts Payable',
+        'Loan Payable',
+        'Sales Tax Payable',
+        'Accrued Liabilities',
+        'Unearned Revenue',
+        'Dividends Payable',
+      ],
+      Equity: ['Common Stock', 'Retained Earnings'],
+    },
+  },
+};
 
 @Injectable()
 export class ReportsService {
@@ -21,17 +63,17 @@ export class ReportsService {
     // record the start time
     const start = performance.now();
     // define the temporary directory and output file path
-    const tmpDir = 'tmp';
-    const outputFile = 'out/accounts.csv';
+    const outDir = REPORT_CONSTANTS.outputDir;
+    const outputFile = REPORT_CONSTANTS.outputFiles.accounts;
     // initialize an object to store account balances
     const accountBalances: Record<string, number> = {};
     // iterate over each file in the temporary directory
-    fs.readdirSync(tmpDir).forEach((file) => {
+    fs.readdirSync(outDir).forEach((file) => {
       // process only csv files
       if (file.endsWith('.csv')) {
         // read and split the file into lines
         const lines = fs
-          .readFileSync(path.join(tmpDir, file), 'utf-8')
+          .readFileSync(path.join(outDir, file), 'utf-8')
           .trim()
           .split('\n');
         // iterate over each line in the file
@@ -66,17 +108,17 @@ export class ReportsService {
     // record the start time
     const start = performance.now();
     // define the temporary directory and output file path
-    const tmpDir = 'tmp';
-    const outputFile = 'out/yearly.csv';
+    const outDir = REPORT_CONSTANTS.outputDir;
+    const outputFile = REPORT_CONSTANTS.outputFiles.yearly;
     // initialize an object to store cash balances by year
     const cashByYear: Record<string, number> = {};
     // iterate over each file in the temporary directory
-    fs.readdirSync(tmpDir).forEach((file) => {
+    fs.readdirSync(outDir).forEach((file) => {
       // process only csv files except yearly.csv
       if (file.endsWith('.csv') && file !== 'yearly.csv') {
         // read and split the file into lines
         const lines = fs
-          .readFileSync(path.join(tmpDir, file), 'utf-8')
+          .readFileSync(path.join(outDir, file), 'utf-8')
           .trim()
           .split('\n');
         // iterate over each line in the file
@@ -118,40 +160,9 @@ export class ReportsService {
     // record the start time
     const start = performance.now();
     // define the temporary directory and output file path
-    const tmpDir = 'tmp';
-    const outputFile = 'out/fs.csv';
-    // define categories for financial statements
-    const categories = {
-      'Income Statement': {
-        Revenues: ['Sales Revenue'],
-        Expenses: [
-          'Cost of Goods Sold',
-          'Salaries Expense',
-          'Rent Expense',
-          'Utilities Expense',
-          'Interest Expense',
-          'Tax Expense',
-        ],
-      },
-      'Balance Sheet': {
-        Assets: [
-          'Cash',
-          'Accounts Receivable',
-          'Inventory',
-          'Fixed Assets',
-          'Prepaid Expenses',
-        ],
-        Liabilities: [
-          'Accounts Payable',
-          'Loan Payable',
-          'Sales Tax Payable',
-          'Accrued Liabilities',
-          'Unearned Revenue',
-          'Dividends Payable',
-        ],
-        Equity: ['Common Stock', 'Retained Earnings'],
-      },
-    };
+    const outDir = REPORT_CONSTANTS.outputDir;
+    const outputFile = REPORT_CONSTANTS.outputFiles.fs;
+    const categories = REPORT_CONSTANTS.categories;
     // initialize balances for all accounts in categories
     const balances: Record<string, number> = {};
     for (const section of Object.values(categories)) {
@@ -162,12 +173,12 @@ export class ReportsService {
       }
     }
     // iterate over each file in the temporary directory
-    fs.readdirSync(tmpDir).forEach((file) => {
+    fs.readdirSync(outDir).forEach((file) => {
       // process only csv files except fs.csv
       if (file.endsWith('.csv') && file !== 'fs.csv') {
         // read and split the file into lines
         const lines = fs
-          .readFileSync(path.join(tmpDir, file), 'utf-8')
+          .readFileSync(path.join(outDir, file), 'utf-8')
           .trim()
           .split('\n');
 
