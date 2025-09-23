@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import fs from 'fs';
-import path from 'path';
+import { listFiles, readFiles, writeFile } from '../lib/fshelper';
 import { performance } from 'perf_hooks';
 
 // Shared constants for report generation
@@ -65,39 +64,28 @@ export class ReportsService {
     // define the temporary directory and output file path
     const outDir = REPORT_CONSTANTS.outputDir;
     const outputFile = REPORT_CONSTANTS.outputFiles.accounts;
-    // initialize an object to store account balances
     const accountBalances: Record<string, number> = {};
-    // iterate over each file in the temporary directory
-    fs.readdirSync(outDir).forEach((file) => {
-      // process only csv files
-      if (file.endsWith('.csv')) {
-        // read and split the file into lines
-        const lines = fs
-          .readFileSync(path.join(outDir, file), 'utf-8')
-          .trim()
-          .split('\n');
-        // iterate over each line in the file
-        for (const line of lines) {
-          // extract account, debit, and credit values from the line
-          const [, account, , debit, credit] = line.split(',');
-          // initialize the account balance if not present
-          if (!accountBalances[account]) {
-            accountBalances[account] = 0;
-          }
-          // update the account balance
-          accountBalances[account] +=
-            parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
+    const files = listFiles(outDir)
+      .filter((file) => file.endsWith('.csv'))
+      .map((file) => `${outDir}/${file}`);
+    const contents = readFiles(files);
+    for (const lines of contents) {
+      for (const line of lines) {
+        const [, account, , debit, credit] = line.split(',');
+        if (!accountBalances[account]) {
+          accountBalances[account] = 0;
         }
+        accountBalances[account] +=
+          parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
       }
-    });
+    }
     // prepare the output array with header
     const output = ['Account,Balance'];
     // add each account and its balance to the output
     for (const [account, balance] of Object.entries(accountBalances)) {
       output.push(`${account},${balance.toFixed(2)}`);
     }
-    // write the output to the csv file
-    fs.writeFileSync(outputFile, output.join('\n'));
+    writeFile(outputFile, output);
     // set the state to finished with elapsed time
     this.states.accounts = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
@@ -110,36 +98,24 @@ export class ReportsService {
     // define the temporary directory and output file path
     const outDir = REPORT_CONSTANTS.outputDir;
     const outputFile = REPORT_CONSTANTS.outputFiles.yearly;
-    // initialize an object to store cash balances by year
     const cashByYear: Record<string, number> = {};
-    // iterate over each file in the temporary directory
-    fs.readdirSync(outDir).forEach((file) => {
-      // process only csv files except yearly.csv
-      if (file.endsWith('.csv') && file !== 'yearly.csv') {
-        // read and split the file into lines
-        const lines = fs
-          .readFileSync(path.join(outDir, file), 'utf-8')
-          .trim()
-          .split('\n');
-        // iterate over each line in the file
-        for (const line of lines) {
-          // extract date, account, debit, and credit values from the line
-          const [date, account, , debit, credit] = line.split(',');
-          // process only cash account
-          if (account === 'Cash') {
-            // extract the year from the date
-            const year = new Date(date).getFullYear();
-            // initialize the cash balance for the year if not present
-            if (!cashByYear[year]) {
-              cashByYear[year] = 0;
-            }
-            // update the cash balance for the year
-            cashByYear[year] +=
-              parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
+    const files = listFiles(outDir)
+      .filter((file) => file.endsWith('.csv') && file !== 'yearly.csv')
+      .map((file) => `${outDir}/${file}`);
+    const contents = readFiles(files);
+    for (const lines of contents) {
+      for (const line of lines) {
+        const [date, account, , debit, credit] = line.split(',');
+        if (account === 'Cash') {
+          const year = new Date(date).getFullYear();
+          if (!cashByYear[year]) {
+            cashByYear[year] = 0;
           }
+          cashByYear[year] +=
+            parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
         }
       }
-    });
+    }
     // prepare the output array with header
     const output = ['Financial Year,Cash Balance'];
     // add each year and its cash balance to the output, sorted by year
@@ -148,8 +124,7 @@ export class ReportsService {
       .forEach((year) => {
         output.push(`${year},${cashByYear[year].toFixed(2)}`);
       });
-    // write the output to the csv file
-    fs.writeFileSync(outputFile, output.join('\n'));
+    writeFile(outputFile, output);
     // set the state to finished with elapsed time
     this.states.yearly = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
@@ -172,29 +147,19 @@ export class ReportsService {
         }
       }
     }
-    // iterate over each file in the temporary directory
-    fs.readdirSync(outDir).forEach((file) => {
-      // process only csv files except fs.csv
-      if (file.endsWith('.csv') && file !== 'fs.csv') {
-        // read and split the file into lines
-        const lines = fs
-          .readFileSync(path.join(outDir, file), 'utf-8')
-          .trim()
-          .split('\n');
-
-        // iterate over each line in the file
-        for (const line of lines) {
-          // extract account, debit, and credit values from the line
-          const [, account, , debit, credit] = line.split(',');
-
-          // update balances if account is in categories
-          if (Object.prototype.hasOwnProperty.call(balances, account)) {
-            balances[account] +=
-              parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
-          }
+    const files = listFiles(outDir)
+      .filter((file) => file.endsWith('.csv') && file !== 'fs.csv')
+      .map((file) => `${outDir}/${file}`);
+    const contents = readFiles(files);
+    for (const lines of contents) {
+      for (const line of lines) {
+        const [, account, , debit, credit] = line.split(',');
+        if (Object.prototype.hasOwnProperty.call(balances, account)) {
+          balances[account] +=
+            parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
         }
       }
-    });
+    }
 
     // prepare the output array for the financial statement
     const output: string[] = [];
@@ -258,8 +223,7 @@ export class ReportsService {
     output.push(
       `Assets = Liabilities + Equity, ${totalAssets.toFixed(2)} = ${(totalLiabilities + totalEquity).toFixed(2)}`,
     );
-    // write the output to the csv file
-    fs.writeFileSync(outputFile, output.join('\n'));
+    writeFile(outputFile, output);
     // set the state to finished with elapsed time
     this.states.fs = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
