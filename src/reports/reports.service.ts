@@ -3,7 +3,6 @@ import { Injectable } from '@nestjs/common';
 import { listFiles, readFiles, writeFile } from '../lib/fshelper';
 import { performance } from 'perf_hooks';
 
-// Shared constants for report generation
 const REPORT_CONSTANTS = {
   outputDir: 'tmp',
   outputFiles: {
@@ -57,54 +56,58 @@ export class ReportsService {
   }
 
   generateReportAccounts() {
-    // set the state to starting
+    // prep data
     this.states.accounts = 'starting';
-    // record the start time
     const start = performance.now();
-    // define the temporary directory and output file path
     const outDir = REPORT_CONSTANTS.outputDir;
     const outputFile = REPORT_CONSTANTS.outputFiles.accounts;
-    const accountBalances: Record<string, number> = {};
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv'))
       .map((file) => `${outDir}/${file}`);
     const contents = readFiles(files);
-    for (const lines of contents) {
-      for (const line of lines) {
+
+    // build data (json array)
+    const accounts: Array<{ account: string; balance: number }> = [];
+    const accountMap: Record<string, number> = {};
+    for (const page of contents) {
+      for (const line of page) {
         const [, account, , debit, credit] = line.split(',');
-        if (!accountBalances[account]) {
-          accountBalances[account] = 0;
+        if (!accountMap[account]) {
+          accountMap[account] = 0;
         }
-        accountBalances[account] +=
+        accountMap[account] +=
           parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
       }
     }
-    // prepare the output array with header
-    const output = ['Account,Balance'];
-    // add each account and its balance to the output
-    for (const [account, balance] of Object.entries(accountBalances)) {
-      output.push(`${account},${balance.toFixed(2)}`);
+    for (const [account, balance] of Object.entries(accountMap)) {
+      accounts.push({ account, balance });
     }
+
+    // serialize data
+    const output = [
+      'Account,Balance',
+      ...accounts.map((a) => `${a.account},${a.balance.toFixed(2)}`),
+    ];
     writeFile(outputFile, output);
-    // set the state to finished with elapsed time
     this.states.accounts = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
   generateReportYearly() {
-    // set the state to starting
+    // prep data
     this.states.yearly = 'starting';
-    // record the start time
     const start = performance.now();
-    // define the temporary directory and output file path
     const outDir = REPORT_CONSTANTS.outputDir;
     const outputFile = REPORT_CONSTANTS.outputFiles.yearly;
-    const cashByYear: Record<string, number> = {};
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv') && file !== 'yearly.csv')
       .map((file) => `${outDir}/${file}`);
     const contents = readFiles(files);
-    for (const lines of contents) {
-      for (const line of lines) {
+
+    // build data (json array)
+    const yearly: Array<{ year: string; cash: number }> = [];
+    const cashByYear: Record<string, number> = {};
+    for (const page of contents) {
+      for (const line of page) {
         const [date, account, , debit, credit] = line.split(',');
         if (account === 'Cash') {
           const year = new Date(date).getFullYear();
@@ -116,29 +119,32 @@ export class ReportsService {
         }
       }
     }
-    // prepare the output array with header
-    const output = ['Financial Year,Cash Balance'];
-    // add each year and its cash balance to the output, sorted by year
-    Object.keys(cashByYear)
-      .sort()
-      .forEach((year) => {
-        output.push(`${year},${cashByYear[year].toFixed(2)}`);
-      });
+    for (const year of Object.keys(cashByYear).sort()) {
+      yearly.push({ year, cash: cashByYear[year] });
+    }
+
+    // serialize data
+    const output = [
+      'Financial Year,Cash Balance',
+      ...yearly.map((y) => `${y.year},${y.cash.toFixed(2)}`),
+    ];
     writeFile(outputFile, output);
-    // set the state to finished with elapsed time
     this.states.yearly = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
   generateReportFinancialStatements() {
-    // set the state to starting
+    // prep data
     this.states.fs = 'starting';
-    // record the start time
     const start = performance.now();
-    // define the temporary directory and output file path
     const outDir = REPORT_CONSTANTS.outputDir;
     const outputFile = REPORT_CONSTANTS.outputFiles.fs;
     const categories = REPORT_CONSTANTS.categories;
-    // initialize balances for all accounts in categories
+    const files = listFiles(outDir)
+      .filter((file) => file.endsWith('.csv') && file !== 'fs.csv')
+      .map((file) => `${outDir}/${file}`);
+    const contents = readFiles(files);
+
+    // build data (json arrays)
     const balances: Record<string, number> = {};
     for (const section of Object.values(categories)) {
       for (const group of Object.values(section)) {
@@ -147,12 +153,8 @@ export class ReportsService {
         }
       }
     }
-    const files = listFiles(outDir)
-      .filter((file) => file.endsWith('.csv') && file !== 'fs.csv')
-      .map((file) => `${outDir}/${file}`);
-    const contents = readFiles(files);
-    for (const lines of contents) {
-      for (const line of lines) {
+    for (const page of contents) {
+      for (const line of page) {
         const [, account, , debit, credit] = line.split(',');
         if (Object.prototype.hasOwnProperty.call(balances, account)) {
           balances[account] +=
@@ -160,71 +162,69 @@ export class ReportsService {
         }
       }
     }
-
-    // prepare the output array for the financial statement
-    const output: string[] = [];
-    output.push('Basic Financial Statement');
-    output.push('');
-    output.push('Income Statement');
-    // calculate and output revenues
+    // Build financial statement rows as JSON arrays
+    const statementRows: Array<string[]> = [];
+    statementRows.push(['Basic Financial Statement']);
+    statementRows.push([]);
+    statementRows.push(['Income Statement']);
     let totalRevenue = 0;
     let totalExpenses = 0;
     for (const account of categories['Income Statement']['Revenues']) {
       const value = balances[account] || 0;
-      output.push(`${account},${value.toFixed(2)}`);
+      statementRows.push([account, value.toFixed(2)]);
       totalRevenue += value;
     }
-    // calculate and output expenses
     for (const account of categories['Income Statement']['Expenses']) {
       const value = balances[account] || 0;
-      output.push(`${account},${value.toFixed(2)}`);
+      statementRows.push([account, value.toFixed(2)]);
       totalExpenses += value;
     }
-    // output net income
-    output.push(`Net Income,${(totalRevenue - totalExpenses).toFixed(2)}`);
-    output.push('');
-    output.push('Balance Sheet');
-    // calculate and output assets
+    statementRows.push([
+      'Net Income',
+      (totalRevenue - totalExpenses).toFixed(2),
+    ]);
+    statementRows.push([]);
+    statementRows.push(['Balance Sheet']);
     let totalAssets = 0;
     let totalLiabilities = 0;
     let totalEquity = 0;
-    output.push('Assets');
+    statementRows.push(['Assets']);
     for (const account of categories['Balance Sheet']['Assets']) {
       const value = balances[account] || 0;
-      output.push(`${account},${value.toFixed(2)}`);
+      statementRows.push([account, value.toFixed(2)]);
       totalAssets += value;
     }
-    output.push(`Total Assets,${totalAssets.toFixed(2)}`);
-    output.push('');
-    output.push('Liabilities');
-    // calculate and output liabilities
+    statementRows.push(['Total Assets', totalAssets.toFixed(2)]);
+    statementRows.push([]);
+    statementRows.push(['Liabilities']);
     for (const account of categories['Balance Sheet']['Liabilities']) {
       const value = balances[account] || 0;
-      output.push(`${account},${value.toFixed(2)}`);
+      statementRows.push([account, value.toFixed(2)]);
       totalLiabilities += value;
     }
-    output.push(`Total Liabilities,${totalLiabilities.toFixed(2)}`);
-    output.push('');
-    output.push('Equity');
-    // calculate and output equity
+    statementRows.push(['Total Liabilities', totalLiabilities.toFixed(2)]);
+    statementRows.push([]);
+    statementRows.push(['Equity']);
     for (const account of categories['Balance Sheet']['Equity']) {
       const value = balances[account] || 0;
-      output.push(`${account},${value.toFixed(2)}`);
+      statementRows.push([account, value.toFixed(2)]);
       totalEquity += value;
     }
-    // add retained earnings from net income to equity
-    output.push(
-      `Retained Earnings (Net Income),${(totalRevenue - totalExpenses).toFixed(2)}`,
-    );
+    statementRows.push([
+      'Retained Earnings (Net Income)',
+      (totalRevenue - totalExpenses).toFixed(2),
+    ]);
     totalEquity += totalRevenue - totalExpenses;
-    output.push(`Total Equity,${totalEquity.toFixed(2)}`);
-    output.push('');
-    // output the accounting equation
-    output.push(
-      `Assets = Liabilities + Equity, ${totalAssets.toFixed(2)} = ${(totalLiabilities + totalEquity).toFixed(2)}`,
-    );
+    statementRows.push(['Total Equity', totalEquity.toFixed(2)]);
+    statementRows.push([]);
+    statementRows.push([
+      'Assets = Liabilities + Equity',
+      `${totalAssets.toFixed(2)} = ${(totalLiabilities + totalEquity).toFixed(2)}`,
+    ]);
+
+    // serialize data
+    const output = statementRows.map((row) => row.join(','));
     writeFile(outputFile, output);
-    // set the state to finished with elapsed time
     this.states.fs = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 }
