@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
-import { listFiles, readFiles, writeFile } from '../lib/fshelper';
+import {
+  listFiles,
+  readFiles,
+  readFilesAsync,
+  writeFile,
+} from '../lib/fshelper';
 import { performance } from 'perf_hooks';
 
 const REPORT_CONSTANTS = {
@@ -55,7 +60,7 @@ export class ReportsService {
     return this.states[scope];
   }
 
-  generateReportAccounts() {
+  async generateReportAccounts() {
     // prep data
     this.states.accounts = 'starting';
     const start = performance.now();
@@ -64,21 +69,44 @@ export class ReportsService {
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv'))
       .map((file) => `${outDir}/${file}`);
-    const contents = readFiles(files);
 
-    // build data (json array)
-    const accounts: Array<{ account: string; balance: number }> = [];
-    const accountMap: Record<string, number> = {};
-    for (const page of contents) {
+    // processor functions
+    const fnProcessPage = (page: string[]): Record<string, number> => {
+      const map: Record<string, number> = {};
       for (const line of page) {
         const [, account, , debit, credit] = line.split(',');
+        if (!map[account]) {
+          map[account] = 0;
+        }
+        map[account] +=
+          parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
+      }
+      return map;
+    };
+    const fnProcessFile = async (
+      filePath: string,
+    ): Promise<Record<string, number>> => {
+      const pages = await readFilesAsync([filePath]);
+      return fnProcessPage(pages[0]); // single file, single page
+    };
+
+    // read files and process in parallel
+    const promises = files.map((file) => fnProcessFile(file));
+    const pageMaps = await Promise.all(promises);
+
+    // merge all page maps into a single accountMap
+    const accountMap: Record<string, number> = {};
+    for (const map of pageMaps) {
+      for (const [account, balance] of Object.entries(map)) {
         if (!accountMap[account]) {
           accountMap[account] = 0;
         }
-        accountMap[account] +=
-          parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
+        accountMap[account] += balance;
       }
     }
+
+    // build data (json array)
+    const accounts: Array<{ account: string; balance: number }> = [];
     for (const [account, balance] of Object.entries(accountMap)) {
       accounts.push({ account, balance });
     }
