@@ -6,9 +6,11 @@ import {
   readFilesAsync,
   writeFile,
 } from '../lib/fshelper';
+import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';
 
 const REPORT_CONSTANTS = {
+  maxConcurrency: 20,
   outputDir: 'tmp',
   outputFiles: {
     accounts: 'out/accounts.csv',
@@ -90,8 +92,9 @@ export class ReportsService {
       return fnProcessPage(pages[0]); // single file, single page
     };
 
-    // read files and process in parallel
-    const promises = files.map((file) => fnProcessFile(file));
+    // limit concurrency for file reading/processing
+    const limit = pLimit(REPORT_CONSTANTS.maxConcurrency);
+    const promises = files.map((file) => limit(() => fnProcessFile(file)));
     const pageMaps = await Promise.all(promises);
 
     // merge all page maps into a single accountMap
