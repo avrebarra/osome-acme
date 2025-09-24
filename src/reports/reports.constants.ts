@@ -1,8 +1,11 @@
-export const QUEUE_REPORT_ACCOUNTS = 'task_generate_report_accounts';
-export const QUEUE_REPORT_YEARLY = 'task_generate_report_yearly';
-export const QUEUE_REPORT_FINANCIAL_STATEMENTS =
-  'task_generate_report_financial_statements';
+// queue related constants
+export const QUEUE_REPORT_PROCESSING = 'task_generate_report';
 
+export type QueueReportProcessingPayload = {
+  taskId: number;
+};
+
+// processing related constants
 export const MAX_CONCURRENCY = 20;
 export const OUTPUT_DIR = 'tmp';
 export const OUTPUT_FILES = {

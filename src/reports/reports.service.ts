@@ -10,37 +10,27 @@ import * as CONSTANTS from './reports.constants';
 @Injectable()
 export class ReportsService {
   constructor(
-    @InjectQueue(CONSTANTS.QUEUE_REPORT_ACCOUNTS)
+    @InjectQueue(CONSTANTS.QUEUE_REPORT_PROCESSING)
     private queueReportAccounts: Queue,
-    @InjectQueue(CONSTANTS.QUEUE_REPORT_YEARLY)
-    private queueReportYearly: Queue,
-    @InjectQueue(CONSTANTS.QUEUE_REPORT_FINANCIAL_STATEMENTS)
-    private queueReportFinancialStatements: Queue,
   ) {}
 
   async enqueueReportTask(taskKind: TaskKind, delay = 0): Promise<number> {
-    // create task record
-    const task = await Task.create({
-      kind: taskKind,
-      state: TaskState.Pending,
+    // find pending task or create new task record
+    let task = await Task.findOne({
+      where: { kind: taskKind, state: TaskState.Pending },
     });
-    const payload = { taskId: task.id };
+    if (!task) {
+      task = await Task.create({
+        kind: taskKind,
+        state: TaskState.Pending,
+      });
+    }
+
+    const payload: CONSTANTS.QueueReportProcessingPayload = { taskId: task.id };
     const opts = delay > 0 ? { delay } : {};
 
     // enqueue task
-    switch (taskKind) {
-      case TaskKind.GenerateReportAccount:
-        await this.queueReportAccounts.add(taskKind, payload, opts);
-        break;
-      case TaskKind.GenerateReportYearly:
-        await this.queueReportYearly.add(taskKind, payload, opts);
-        break;
-      case TaskKind.GenerateReportFinancialStatements:
-        await this.queueReportFinancialStatements.add(taskKind, payload, opts);
-        break;
-      default:
-        throw new Error('Unknown task kind: ' + String(taskKind));
-    }
+    await this.queueReportAccounts.add(taskKind, payload, opts);
 
     return task.id;
   }
@@ -49,12 +39,6 @@ export class ReportsService {
     // fetch task
     const task = await Task.findByPk(taskId);
     if (!task) throw new Error(`Task with ID ${taskId} not found`);
-
-    // requeue if not pending
-    if (task.state !== TaskState.Pending) {
-      await this.enqueueReportTask(task.kind, 1000 * 60); // retry in 1 min
-      return;
-    }
 
     // set task to 'in_progress'
     task.state = TaskState.InProgress;

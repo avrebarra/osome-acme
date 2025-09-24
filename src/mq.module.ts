@@ -1,6 +1,7 @@
 import { BullModule, RegisterQueueOptions } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { WorkerGenerateReportAccounts } from './reports/reports.worker';
+import { WorkerGenerateReport } from './reports/reports.worker';
+import { ReportsService } from './reports/reports.service';
 
 const CONFIG_DEFAULTS = {
   host: 'localhost',
@@ -24,7 +25,7 @@ export function registerQueue(...options: RegisterQueueOptions[]) {
     registerQueue({ name: 'task_generate_report_yearly' }),
     registerQueue({ name: 'task_generate_report_financial_statements' }),
   ],
-  providers: [WorkerGenerateReportAccounts],
+  providers: [ReportsService, WorkerGenerateReport],
   exports: [BullModule],
 })
 export class MqModule {}

@@ -23,15 +23,7 @@ describe('ReportsService', () => {
       providers: [
         ReportsService,
         {
-          provide: getQueueToken('task_generate_report_accounts'),
-          useValue: mockQueue,
-        },
-        {
-          provide: getQueueToken('task_generate_report_yearly'),
-          useValue: mockQueue,
-        },
-        {
-          provide: getQueueToken('task_generate_report_financial_statements'),
+          provide: getQueueToken('task_generate_report'),
           useValue: mockQueue,
         },
       ],
