@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReportsService } from './reports.service';
+import { getQueueToken } from '@nestjs/bullmq';
 
 // Mock the fshelper module
 jest.mock('../lib/fshelper', () => ({
@@ -13,11 +14,27 @@ import { listFiles, readFilesAsync, writeFile } from '../lib/fshelper';
 describe('ReportsService', () => {
   let service: ReportsService;
 
+  const mockQueue = { add: jest.fn() };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ReportsService],
+      providers: [
+        ReportsService,
+        {
+          provide: getQueueToken('task_generate_report_accounts'),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken('task_generate_report_yearly'),
+          useValue: mockQueue,
+        },
+        {
+          provide: getQueueToken('task_generate_report_financial_statements'),
+          useValue: mockQueue,
+        },
+      ],
     }).compile();
 
     service = module.get<ReportsService>(ReportsService);
