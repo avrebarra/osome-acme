@@ -286,8 +286,7 @@ export class ReportsService {
     statementRows.push(['Total Equity', totalEquity.toFixed(2)]);
     statementRows.push([]);
     statementRows.push([
-      'Assets = Liabilities + Equity',
-      `${totalAssets.toFixed(2)} = ${(totalLiabilities + totalEquity).toFixed(2)}`,
+      `Assets = Liabilities + Equity ${totalAssets.toFixed(2)} = ${(totalLiabilities + totalEquity).toFixed(2)}`,
     ]);
 
     // serialize data
