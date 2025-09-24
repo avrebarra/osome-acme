@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';
 import { Queue } from 'bullmq';
-import { Task } from '../../db/models/Task';
+import { Task, TaskState } from '../../db/models/Task';
 
 const REPORT_CONSTANTS = {
   maxConcurrency: 20,
@@ -88,13 +88,13 @@ export class ReportsService {
     if (!task) throw new Error(`Task with ID ${taskId} not found`);
 
     // requeue if not pending
-    if (task.state !== 'pending') {
+    if (task.state !== TaskState.Pending) {
       await this.enqueueReportTask(task.kind, 1000 * 60); // retry in 1 min
       return;
     }
 
     // set task to 'in_progress'
-    task.state = 'in_progress';
+    task.state = TaskState.InProgress;
     task.metadata = { startedAt: new Date() };
     await task.save();
 
@@ -113,7 +113,7 @@ export class ReportsService {
         throw new Error(`Unknown task kind: ${task.kind}`);
     }
 
-    task.state = 'done';
+    task.state = TaskState.Done;
     task.metadata = {
       ...task.metadata,
       finishedAt: new Date(),
@@ -147,7 +147,7 @@ export class ReportsService {
         states[kind] = 'idle';
         continue;
       }
-      if (task.state == 'done') {
+      if (task.state == TaskState.Done) {
         const duration = (task.metadata as { duration?: number })?.duration;
         states[kind] = duration
           ? `finished in ${(duration / 1000).toFixed(2)}`
