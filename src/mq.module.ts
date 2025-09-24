@@ -21,9 +21,7 @@ export function registerQueue(...options: RegisterQueueOptions[]) {
       },
     }),
     // register queues here
-    registerQueue({ name: 'task_generate_report_accounts' }),
-    registerQueue({ name: 'task_generate_report_yearly' }),
-    registerQueue({ name: 'task_generate_report_financial_statements' }),
+    registerQueue({ name: 'task_generate_report' }),
   ],
   providers: [ReportsService, WorkerGenerateReport],
   exports: [BullModule],
