@@ -4,6 +4,7 @@ import { Model, ModelCtor } from 'sequelize-typescript';
 import { Company } from '../../db/models/Company';
 import { Ticket } from '../../db/models/Ticket';
 import { User } from '../../db/models/User';
+import { Task } from '../../db/models/Task';
 import { DbModule } from '../db.module';
 
 beforeEach(async () => {
@@ -16,7 +17,7 @@ export async function cleanTables() {
     imports: [DbModule],
   }).compile();
 
-  const models: ModelCtor<Model>[] = [Ticket, User, Company];
+  const models: ModelCtor<Model>[] = [Ticket, User, Company, Task];
   for (const model of models) {
     await cleanTable(model);
   }

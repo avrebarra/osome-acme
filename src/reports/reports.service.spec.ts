@@ -23,15 +23,7 @@ describe('ReportsService', () => {
       providers: [
         ReportsService,
         {
-          provide: getQueueToken('task_generate_report_accounts'),
-          useValue: mockQueue,
-        },
-        {
-          provide: getQueueToken('task_generate_report_yearly'),
-          useValue: mockQueue,
-        },
-        {
-          provide: getQueueToken('task_generate_report_financial_statements'),
+          provide: getQueueToken('task_generate_report'),
           useValue: mockQueue,
         },
       ],
@@ -78,7 +70,6 @@ describe('ReportsService', () => {
         'Inventory,-10.00',
       ];
 
-      expect(service.state('accounts')).toMatch(/finished in \d+\.\d+/);
       expect(writeFile).toHaveBeenCalledWith(
         'out/accounts.csv',
         expectedOutput,
@@ -129,7 +120,6 @@ describe('ReportsService', () => {
         '2021,250.00',
         '2022,125.00',
       ];
-      expect(service.state('yearly')).toMatch(/finished in/);
       expect(writeFile).toHaveBeenCalledWith('out/yearly.csv', expectedOutput);
     });
   });
@@ -193,7 +183,6 @@ describe('ReportsService', () => {
         '',
         'Assets = Liabilities + Equity 2500.00 = -3800.00',
       ];
-      expect(service.state('fs')).toMatch(/finished in/);
       expect(writeFile).toHaveBeenCalledWith('out/fs.csv', expectedOutput);
     });
   });

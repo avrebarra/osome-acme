@@ -4,75 +4,119 @@ import { Injectable } from '@nestjs/common';
 import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';
 import { Queue } from 'bullmq';
-
-const REPORT_CONSTANTS = {
-  maxConcurrency: 20,
-  outputDir: 'tmp',
-  outputFiles: {
-    accounts: 'out/accounts.csv',
-    yearly: 'out/yearly.csv',
-    fs: 'out/fs.csv',
-  },
-  categories: {
-    'Income Statement': {
-      Revenues: ['Sales Revenue'],
-      Expenses: [
-        'Cost of Goods Sold',
-        'Salaries Expense',
-        'Rent Expense',
-        'Utilities Expense',
-        'Interest Expense',
-        'Tax Expense',
-      ],
-    },
-    'Balance Sheet': {
-      Assets: [
-        'Cash',
-        'Accounts Receivable',
-        'Inventory',
-        'Fixed Assets',
-        'Prepaid Expenses',
-      ],
-      Liabilities: [
-        'Accounts Payable',
-        'Loan Payable',
-        'Sales Tax Payable',
-        'Accrued Liabilities',
-        'Unearned Revenue',
-        'Dividends Payable',
-      ],
-      Equity: ['Common Stock', 'Retained Earnings'],
-    },
-  },
-};
+import { Task, TaskState, TaskKind } from '../../db/models/Task';
+import * as CONSTANTS from './reports.constants';
 
 @Injectable()
 export class ReportsService {
-  private states = {
-    accounts: 'idle',
-    yearly: 'idle',
-    fs: 'idle',
-  };
-
   constructor(
-    @InjectQueue('task_generate_report_accounts')
+    @InjectQueue(CONSTANTS.QUEUE_REPORT_PROCESSING)
     private queueReportAccounts: Queue,
-    @InjectQueue('task_generate_report_yearly')
-    private queueReportYearly: Queue,
-    @InjectQueue('task_generate_report_financial_statements')
-    private queueReportFinancialStatements: Queue,
   ) {}
 
-  state(scope: keyof typeof this.states): string {
-    return this.states[scope];
+  async enqueueReportTask(taskKind: TaskKind, delay = 0): Promise<number> {
+    // find pending task or create new task record
+    let task = await Task.findOne({
+      where: { kind: taskKind, state: TaskState.Pending },
+    });
+    if (!task) {
+      task = await Task.create({
+        kind: taskKind,
+        state: TaskState.Pending,
+      });
+    }
+
+    const payload: CONSTANTS.QueueReportProcessingPayload = { taskId: task.id };
+    const opts = delay > 0 ? { delay } : {};
+
+    // enqueue task
+    await this.queueReportAccounts.add(taskKind, payload, opts);
+
+    return task.id;
+  }
+
+  async processReportTask(taskId: number) {
+    // fetch task
+    const task = await Task.findByPk(taskId);
+    if (!task) throw new Error(`Task with ID ${taskId} not found`);
+    if (task.state !== TaskState.Pending) return;
+
+    // set task to 'in_progress'
+    task.state = TaskState.InProgress;
+    task.metadata = { startedAt: new Date() };
+    await task.save();
+
+    const t0 = performance.now();
+    switch (task.kind) {
+      case TaskKind.GenerateReportAccount:
+        await this.generateReportAccounts();
+        break;
+      case TaskKind.GenerateReportYearly:
+        await this.generateReportYearly();
+        break;
+      case TaskKind.GenerateReportFinancialStatements:
+        await this.generateReportFinancialStatements();
+        break;
+      default:
+        throw new Error('Unknown task kind: ' + String(task.kind));
+    }
+
+    task.state = TaskState.Done;
+    task.metadata = {
+      ...task.metadata,
+      finishedAt: new Date(),
+      duration: performance.now() - t0,
+    };
+    await task.save();
+  }
+
+  async getReportStates() {
+    const kinds = [
+      TaskKind.GenerateReportAccount,
+      TaskKind.GenerateReportYearly,
+      TaskKind.GenerateReportFinancialStatements,
+    ];
+
+    // fetch latest task for each kind
+    const states: Record<string, string> = {};
+    const tasks = await Promise.all(
+      kinds.map((kind) =>
+        Task.findOne({
+          where: { kind },
+          order: [['createdAt', 'DESC']],
+        }),
+      ),
+    );
+
+    // determine state for each kind
+    for (const kind of kinds) {
+      const task = tasks.filter((t) => t != null).find((t) => t.kind === kind);
+      if (!task) {
+        states[kind] = 'idle';
+        continue;
+      }
+      if (task.state == TaskState.Done) {
+        const duration = (task.metadata as { duration?: number })?.duration;
+        states[kind] = duration
+          ? `finished in ${(duration / 1000).toFixed(2)}`
+          : 'finished';
+        continue;
+      }
+      states[kind] = task.state;
+    }
+
+    // return states ;
+    return {
+      'accounts.csv': states[TaskKind.GenerateReportAccount],
+      'yearly.csv': states[TaskKind.GenerateReportYearly],
+      'fs.csv': states[TaskKind.GenerateReportFinancialStatements],
+    };
   }
 
   async generateReportAccounts() {
     // prep data
-    this.states.accounts = 'starting';
-    const start = performance.now();
-    const outDir = REPORT_CONSTANTS.outputDir;
-    const outputFile = REPORT_CONSTANTS.outputFiles.accounts;
+    const outDir = CONSTANTS.OUTPUT_DIR;
+    const outputFile = CONSTANTS.OUTPUT_FILES.accounts;
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv'))
       .map((file) => `${outDir}/${file}`);
@@ -98,7 +142,7 @@ export class ReportsService {
     };
 
     // limit concurrency for file reading/processing
-    const limit = pLimit(REPORT_CONSTANTS.maxConcurrency);
+    const limit = pLimit(CONSTANTS.MAX_CONCURRENCY);
     const promises = files.map((file) => limit(() => fnProcessFile(file)));
     const pageMaps = await Promise.all(promises);
 
@@ -125,15 +169,12 @@ export class ReportsService {
       ...accounts.map((a) => `${a.account},${a.balance.toFixed(2)}`),
     ];
     writeFile(outputFile, output);
-    this.states.accounts = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
   async generateReportYearly() {
     // prep data
-    this.states.yearly = 'starting';
-    const start = performance.now();
-    const outDir = REPORT_CONSTANTS.outputDir;
-    const outputFile = REPORT_CONSTANTS.outputFiles.yearly;
+    const outDir = CONSTANTS.OUTPUT_DIR;
+    const outputFile = CONSTANTS.OUTPUT_FILES.yearly;
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv') && file !== 'yearly.csv')
       .map((file) => `${outDir}/${file}`);
@@ -162,7 +203,7 @@ export class ReportsService {
     };
 
     // limit concurrency for file reading/processing
-    const limit = pLimit(REPORT_CONSTANTS.maxConcurrency);
+    const limit = pLimit(CONSTANTS.MAX_CONCURRENCY);
     const promises = files.map((file) => limit(() => fnProcessFile(file)));
     const pageMaps = await Promise.all(promises);
 
@@ -189,16 +230,44 @@ export class ReportsService {
       ...yearly.map((y) => `${y.year},${y.cash.toFixed(2)}`),
     ];
     writeFile(outputFile, output);
-    this.states.yearly = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
   async generateReportFinancialStatements() {
     // prep data
-    this.states.fs = 'starting';
-    const start = performance.now();
-    const outDir = REPORT_CONSTANTS.outputDir;
-    const outputFile = REPORT_CONSTANTS.outputFiles.fs;
-    const categories = REPORT_CONSTANTS.categories;
+    const outDir = CONSTANTS.OUTPUT_DIR;
+    const outputFile = CONSTANTS.OUTPUT_FILES.fs;
+    const categories = {
+      'Income Statement': {
+        Revenues: ['Sales Revenue'],
+        Expenses: [
+          'Cost of Goods Sold',
+          'Salaries Expense',
+          'Rent Expense',
+          'Utilities Expense',
+          'Interest Expense',
+          'Tax Expense',
+        ],
+      },
+      'Balance Sheet': {
+        Assets: [
+          'Cash',
+          'Accounts Receivable',
+          'Inventory',
+          'Fixed Assets',
+          'Prepaid Expenses',
+        ],
+        Liabilities: [
+          'Accounts Payable',
+          'Loan Payable',
+          'Sales Tax Payable',
+          'Accrued Liabilities',
+          'Unearned Revenue',
+          'Dividends Payable',
+        ],
+        Equity: ['Common Stock', 'Retained Earnings'],
+      },
+    };
+
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv') && file !== 'fs.csv')
       .map((file) => `${outDir}/${file}`);
@@ -235,7 +304,7 @@ export class ReportsService {
     }
 
     // limit concurrency for file reading/processing
-    const limit = pLimit(REPORT_CONSTANTS.maxConcurrency);
+    const limit = pLimit(CONSTANTS.MAX_CONCURRENCY);
     await Promise.all(
       files.map((file) => limit(() => fnProcessFile(file, balances))),
     );
@@ -302,6 +371,5 @@ export class ReportsService {
     // serialize data
     const output = statementRows.map((row) => row.join(','));
     writeFile(outputFile, output);
-    this.states.fs = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 }
