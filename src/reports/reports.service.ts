@@ -39,6 +39,7 @@ export class ReportsService {
     // fetch task
     const task = await Task.findByPk(taskId);
     if (!task) throw new Error(`Task with ID ${taskId} not found`);
+    if (task.state !== TaskState.Pending) return;
 
     // set task to 'in_progress'
     task.state = TaskState.InProgress;
