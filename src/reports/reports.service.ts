@@ -1,11 +1,6 @@
+import { listFiles, readFilesAsync, writeFile } from '../lib/fshelper';
 import { Injectable } from '@nestjs/common';
 
-import {
-  listFiles,
-  readFiles,
-  readFilesAsync,
-  writeFile,
-} from '../lib/fshelper';
 import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';
 
@@ -123,7 +118,7 @@ export class ReportsService {
     this.states.accounts = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
-  generateReportYearly() {
+  async generateReportYearly() {
     // prep data
     this.states.yearly = 'starting';
     const start = performance.now();
@@ -132,24 +127,48 @@ export class ReportsService {
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv') && file !== 'yearly.csv')
       .map((file) => `${outDir}/${file}`);
-    const contents = readFiles(files);
 
-    // build data (json array)
-    const yearly: Array<{ year: string; cash: number }> = [];
-    const cashByYear: Record<string, number> = {};
-    for (const page of contents) {
+    // processor functions
+    const fnProcessPage = (page: string[]): Record<string, number> => {
+      const map: Record<string, number> = {};
       for (const line of page) {
         const [date, account, , debit, credit] = line.split(',');
         if (account === 'Cash') {
           const year = new Date(date).getFullYear();
-          if (!cashByYear[year]) {
-            cashByYear[year] = 0;
+          if (!map[year]) {
+            map[year] = 0;
           }
-          cashByYear[year] +=
+          map[year] +=
             parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
         }
       }
+      return map;
+    };
+    const fnProcessFile = async (
+      filePath: string,
+    ): Promise<Record<string, number>> => {
+      const pages = await readFilesAsync([filePath]);
+      return fnProcessPage(pages[0]); // single file, single page
+    };
+
+    // limit concurrency for file reading/processing
+    const limit = pLimit(REPORT_CONSTANTS.maxConcurrency);
+    const promises = files.map((file) => limit(() => fnProcessFile(file)));
+    const pageMaps = await Promise.all(promises);
+
+    // merge all page maps into a single cashByYear map
+    const cashByYear: Record<string, number> = {};
+    for (const map of pageMaps) {
+      for (const [year, cash] of Object.entries(map)) {
+        if (!cashByYear[year]) {
+          cashByYear[year] = 0;
+        }
+        cashByYear[year] += cash;
+      }
     }
+
+    // build data (json array)
+    const yearly: Array<{ year: string; cash: number }> = [];
     for (const year of Object.keys(cashByYear).sort()) {
       yearly.push({ year, cash: cashByYear[year] });
     }
@@ -163,7 +182,7 @@ export class ReportsService {
     this.states.yearly = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
-  generateReportFinancialStatements() {
+  async generateReportFinancialStatements() {
     // prep data
     this.states.fs = 'starting';
     const start = performance.now();
@@ -173,9 +192,29 @@ export class ReportsService {
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv') && file !== 'fs.csv')
       .map((file) => `${outDir}/${file}`);
-    const contents = readFiles(files);
 
-    // build data (json arrays)
+    // processor functions
+    const fnProcessPage = (
+      page: string[],
+      balances: Record<string, number>,
+    ) => {
+      for (const line of page) {
+        const [, account, , debit, credit] = line.split(',');
+        if (Object.prototype.hasOwnProperty.call(balances, account)) {
+          balances[account] +=
+            parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
+        }
+      }
+    };
+    const fnProcessFile = async (
+      filePath: string,
+      balances: Record<string, number>,
+    ): Promise<void> => {
+      const pages = await readFilesAsync([filePath]);
+      fnProcessPage(pages[0], balances); // single file, single page
+    };
+
+    // initialize balances
     const balances: Record<string, number> = {};
     for (const section of Object.values(categories)) {
       for (const group of Object.values(section)) {
@@ -184,15 +223,13 @@ export class ReportsService {
         }
       }
     }
-    for (const page of contents) {
-      for (const line of page) {
-        const [, account, , debit, credit] = line.split(',');
-        if (Object.prototype.hasOwnProperty.call(balances, account)) {
-          balances[account] +=
-            parseFloat(String(debit || 0)) - parseFloat(String(credit || 0));
-        }
-      }
-    }
+
+    // limit concurrency for file reading/processing
+    const limit = pLimit(REPORT_CONSTANTS.maxConcurrency);
+    await Promise.all(
+      files.map((file) => limit(() => fnProcessFile(file, balances))),
+    );
+
     // Build financial statement rows as JSON arrays
     const statementRows: Array<string[]> = [];
     statementRows.push(['Basic Financial Statement']);
