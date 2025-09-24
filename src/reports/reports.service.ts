@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';
 import { Queue } from 'bullmq';
+import { Task } from '../../db/models/Task';
 
 const REPORT_CONSTANTS = {
   maxConcurrency: 20,
@@ -48,12 +49,6 @@ const REPORT_CONSTANTS = {
 
 @Injectable()
 export class ReportsService {
-  private states = {
-    accounts: 'idle',
-    yearly: 'idle',
-    fs: 'idle',
-  };
-
   constructor(
     @InjectQueue('task_generate_report_accounts')
     private queueReportAccounts: Queue,
@@ -63,14 +58,85 @@ export class ReportsService {
     private queueReportFinancialStatements: Queue,
   ) {}
 
-  state(scope: keyof typeof this.states): string {
-    return this.states[scope];
+  async processReportTask(taskId: number) {
+    // fetch task
+    const task = await Task.findByPk(taskId);
+    if (!task) throw new Error(`Task with ID ${taskId} not found`);
+
+    // set task to 'in_progress'
+    task.state = 'in_progress';
+    task.metadata = { startedAt: new Date() };
+    await task.save();
+
+    const t0 = performance.now();
+    switch (task.kind) {
+      case 'generate_report_account':
+        await this.generateReportAccounts();
+        break;
+      case 'generate_report_yearly':
+        await this.generateReportYearly();
+        break;
+      case 'generate_report_financial_statements':
+        await this.generateReportFinancialStatements();
+        break;
+      default:
+        throw new Error(`Unknown task kind: ${task.kind}`);
+    }
+
+    task.state = 'done';
+    task.metadata = {
+      ...task.metadata,
+      finishedAt: new Date(),
+      duration: performance.now() - t0,
+    };
+    await task.save();
+  }
+
+  async getReportStates() {
+    const kinds = [
+      'generate_report_account',
+      'generate_report_yearly',
+      'generate_report_financial_statements',
+    ];
+
+    // fetch latest task for each kind
+    const states: Record<string, string> = {};
+    const tasks = await Promise.all(
+      kinds.map((kind) =>
+        Task.findOne({
+          where: { kind },
+          order: [['createdAt', 'DESC']],
+        }),
+      ),
+    );
+
+    // determine state for each kind
+    for (const kind of kinds) {
+      const task = tasks.filter((t) => t != null).find((t) => t.kind === kind);
+      if (!task) {
+        states[kind] = 'idle';
+        continue;
+      }
+      if (task.state == 'done') {
+        const duration = (task.metadata as { duration?: number })?.duration;
+        states[kind] = duration
+          ? `finished in ${(duration / 1000).toFixed(2)}`
+          : 'finished';
+        continue;
+      }
+      states[kind] = task.state;
+    }
+
+    // return states ;
+    return {
+      'accounts.csv': states['generate_report_account'],
+      'yearly.csv': states['generate_report_yearly'],
+      'fs.csv': states['generate_report_financial_statements'],
+    };
   }
 
   async generateReportAccounts() {
     // prep data
-    this.states.accounts = 'starting';
-    const start = performance.now();
     const outDir = REPORT_CONSTANTS.outputDir;
     const outputFile = REPORT_CONSTANTS.outputFiles.accounts;
     const files = listFiles(outDir)
@@ -125,13 +191,10 @@ export class ReportsService {
       ...accounts.map((a) => `${a.account},${a.balance.toFixed(2)}`),
     ];
     writeFile(outputFile, output);
-    this.states.accounts = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
   async generateReportYearly() {
     // prep data
-    this.states.yearly = 'starting';
-    const start = performance.now();
     const outDir = REPORT_CONSTANTS.outputDir;
     const outputFile = REPORT_CONSTANTS.outputFiles.yearly;
     const files = listFiles(outDir)
@@ -189,13 +252,10 @@ export class ReportsService {
       ...yearly.map((y) => `${y.year},${y.cash.toFixed(2)}`),
     ];
     writeFile(outputFile, output);
-    this.states.yearly = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 
   async generateReportFinancialStatements() {
     // prep data
-    this.states.fs = 'starting';
-    const start = performance.now();
     const outDir = REPORT_CONSTANTS.outputDir;
     const outputFile = REPORT_CONSTANTS.outputFiles.fs;
     const categories = REPORT_CONSTANTS.categories;
@@ -302,6 +362,5 @@ export class ReportsService {
     // serialize data
     const output = statementRows.map((row) => row.join(','));
     writeFile(outputFile, output);
-    this.states.fs = `finished in ${((performance.now() - start) / 1000).toFixed(2)}`;
   }
 }

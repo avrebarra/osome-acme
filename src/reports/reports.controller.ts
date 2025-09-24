@@ -6,12 +6,8 @@ export class ReportsController {
   constructor(private reportsService: ReportsService) {}
 
   @Get()
-  report() {
-    return {
-      'accounts.csv': this.reportsService.state('accounts'),
-      'yearly.csv': this.reportsService.state('yearly'),
-      'fs.csv': this.reportsService.state('fs'),
-    };
+  async report() {
+    return await this.reportsService.getReportStates();
   }
 
   @Post()
