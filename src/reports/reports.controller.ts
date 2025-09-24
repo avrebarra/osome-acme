@@ -14,9 +14,11 @@ export class ReportsController {
   @HttpCode(201)
   async generate() {
     await Promise.all([
-      this.reportsService.generateReportAccounts(),
-      this.reportsService.generateReportYearly(),
-      this.reportsService.generateReportFinancialStatements(),
+      this.reportsService.enqueueReportTask('generate_report_account'),
+      this.reportsService.enqueueReportTask('generate_report_yearly'),
+      this.reportsService.enqueueReportTask(
+        'generate_report_financial_statements',
+      ),
     ]);
     return { message: 'finished' };
   }

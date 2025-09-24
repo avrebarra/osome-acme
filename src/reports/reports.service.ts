@@ -58,10 +58,40 @@ export class ReportsService {
     private queueReportFinancialStatements: Queue,
   ) {}
 
+  async enqueueReportTask(taskKind: string, delay = 0): Promise<number> {
+    // create task record
+    const task = await Task.create({ kind: taskKind, state: 'pending' });
+    const payload = { taskId: task.id };
+    const opts = delay > 0 ? { delay } : {};
+
+    // enqueue task
+    switch (taskKind) {
+      case 'generate_report_account':
+        await this.queueReportAccounts.add(taskKind, payload, opts);
+        break;
+      case 'generate_report_yearly':
+        await this.queueReportYearly.add(taskKind, payload, opts);
+        break;
+      case 'generate_report_financial_statements':
+        await this.queueReportFinancialStatements.add(taskKind, payload, opts);
+        break;
+      default:
+        throw new Error(`Unknown task kind: ${taskKind}`);
+    }
+
+    return task.id;
+  }
+
   async processReportTask(taskId: number) {
     // fetch task
     const task = await Task.findByPk(taskId);
     if (!task) throw new Error(`Task with ID ${taskId} not found`);
+
+    // requeue if not pending
+    if (task.state !== 'pending') {
+      await this.enqueueReportTask(task.kind, 1000 * 60); // retry in 1 min
+      return;
+    }
 
     // set task to 'in_progress'
     task.state = 'in_progress';
