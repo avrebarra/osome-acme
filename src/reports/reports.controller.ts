@@ -16,10 +16,12 @@ export class ReportsController {
 
   @Post()
   @HttpCode(201)
-  generate() {
-    this.reportsService.generateReportAccounts();
-    this.reportsService.generateReportYearly();
-    this.reportsService.generateReportFinancialStatements();
+  async generate() {
+    await Promise.all([
+      this.reportsService.generateReportAccounts(),
+      this.reportsService.generateReportYearly(),
+      this.reportsService.generateReportFinancialStatements(),
+    ]);
     return { message: 'finished' };
   }
 }
