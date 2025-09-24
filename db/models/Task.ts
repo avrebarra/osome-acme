@@ -28,11 +28,11 @@ export class Task extends Model {
   declare id: number;
 
   @Column({ type: DataType.STRING(50), allowNull: false })
-  kind!: TaskKind;
+  declare kind: TaskKind;
 
   @Column({ type: DataType.STRING(50), allowNull: false })
-  state!: TaskState;
+  declare state: TaskState;
 
   @Column({ type: DataType.JSON, allowNull: true })
-  metadata?: object;
+  declare metadata?: object;
 }
