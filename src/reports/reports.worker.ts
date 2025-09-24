@@ -1,8 +1,9 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { QUEUE_REPORT_ACCOUNTS } from './reports.constants';
 
-@Processor('task_generate_report_accounts')
+@Processor(QUEUE_REPORT_ACCOUNTS)
 export class WorkerGenerateReportAccounts extends WorkerHost {
   private readonly logger = new Logger(WorkerGenerateReportAccounts.name);
 

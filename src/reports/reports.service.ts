@@ -5,6 +5,11 @@ import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';
 import { Queue } from 'bullmq';
 import { Task, TaskState, TaskKind } from '../../db/models/Task';
+import {
+  QUEUE_REPORT_ACCOUNTS,
+  QUEUE_REPORT_FINANCIAL_STATEMENTS,
+  QUEUE_REPORT_YEARLY,
+} from './reports.constants';
 
 const REPORT_CONSTANTS = {
   maxConcurrency: 20,
@@ -50,11 +55,11 @@ const REPORT_CONSTANTS = {
 @Injectable()
 export class ReportsService {
   constructor(
-    @InjectQueue('task_generate_report_accounts')
+    @InjectQueue(QUEUE_REPORT_ACCOUNTS)
     private queueReportAccounts: Queue,
-    @InjectQueue('task_generate_report_yearly')
+    @InjectQueue(QUEUE_REPORT_YEARLY)
     private queueReportYearly: Queue,
-    @InjectQueue('task_generate_report_financial_statements')
+    @InjectQueue(QUEUE_REPORT_FINANCIAL_STATEMENTS)
     private queueReportFinancialStatements: Queue,
   ) {}
 
