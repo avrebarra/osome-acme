@@ -5,7 +5,7 @@ import { Company } from '../db/models/Company';
 import { Ticket } from '../db/models/Ticket';
 import { User } from '../db/models/User';
 import dbConfig from '../db/config/config.json';
-import { Task } from 'db/models/Task';
+import { Task } from '../db/models/Task';
 
 const devConfig = dbConfig.development as SequelizeModuleOptions;
 const testConfig = dbConfig.test as SequelizeModuleOptions;
