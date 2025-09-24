@@ -5,61 +5,16 @@ import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';
 import { Queue } from 'bullmq';
 import { Task, TaskState, TaskKind } from '../../db/models/Task';
-import {
-  QUEUE_REPORT_ACCOUNTS,
-  QUEUE_REPORT_FINANCIAL_STATEMENTS,
-  QUEUE_REPORT_YEARLY,
-} from './reports.constants';
-
-const REPORT_CONSTANTS = {
-  maxConcurrency: 20,
-  outputDir: 'tmp',
-  outputFiles: {
-    accounts: 'out/accounts.csv',
-    yearly: 'out/yearly.csv',
-    fs: 'out/fs.csv',
-  },
-  categories: {
-    'Income Statement': {
-      Revenues: ['Sales Revenue'],
-      Expenses: [
-        'Cost of Goods Sold',
-        'Salaries Expense',
-        'Rent Expense',
-        'Utilities Expense',
-        'Interest Expense',
-        'Tax Expense',
-      ],
-    },
-    'Balance Sheet': {
-      Assets: [
-        'Cash',
-        'Accounts Receivable',
-        'Inventory',
-        'Fixed Assets',
-        'Prepaid Expenses',
-      ],
-      Liabilities: [
-        'Accounts Payable',
-        'Loan Payable',
-        'Sales Tax Payable',
-        'Accrued Liabilities',
-        'Unearned Revenue',
-        'Dividends Payable',
-      ],
-      Equity: ['Common Stock', 'Retained Earnings'],
-    },
-  },
-};
+import * as CONSTANTS from './reports.constants';
 
 @Injectable()
 export class ReportsService {
   constructor(
-    @InjectQueue(QUEUE_REPORT_ACCOUNTS)
+    @InjectQueue(CONSTANTS.QUEUE_REPORT_ACCOUNTS)
     private queueReportAccounts: Queue,
-    @InjectQueue(QUEUE_REPORT_YEARLY)
+    @InjectQueue(CONSTANTS.QUEUE_REPORT_YEARLY)
     private queueReportYearly: Queue,
-    @InjectQueue(QUEUE_REPORT_FINANCIAL_STATEMENTS)
+    @InjectQueue(CONSTANTS.QUEUE_REPORT_FINANCIAL_STATEMENTS)
     private queueReportFinancialStatements: Queue,
   ) {}
 
@@ -175,8 +130,8 @@ export class ReportsService {
 
   async generateReportAccounts() {
     // prep data
-    const outDir = REPORT_CONSTANTS.outputDir;
-    const outputFile = REPORT_CONSTANTS.outputFiles.accounts;
+    const outDir = CONSTANTS.OUTPUT_DIR;
+    const outputFile = CONSTANTS.OUTPUT_FILES.accounts;
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv'))
       .map((file) => `${outDir}/${file}`);
@@ -202,7 +157,7 @@ export class ReportsService {
     };
 
     // limit concurrency for file reading/processing
-    const limit = pLimit(REPORT_CONSTANTS.maxConcurrency);
+    const limit = pLimit(CONSTANTS.MAX_CONCURRENCY);
     const promises = files.map((file) => limit(() => fnProcessFile(file)));
     const pageMaps = await Promise.all(promises);
 
@@ -233,8 +188,8 @@ export class ReportsService {
 
   async generateReportYearly() {
     // prep data
-    const outDir = REPORT_CONSTANTS.outputDir;
-    const outputFile = REPORT_CONSTANTS.outputFiles.yearly;
+    const outDir = CONSTANTS.OUTPUT_DIR;
+    const outputFile = CONSTANTS.OUTPUT_FILES.yearly;
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv') && file !== 'yearly.csv')
       .map((file) => `${outDir}/${file}`);
@@ -263,7 +218,7 @@ export class ReportsService {
     };
 
     // limit concurrency for file reading/processing
-    const limit = pLimit(REPORT_CONSTANTS.maxConcurrency);
+    const limit = pLimit(CONSTANTS.MAX_CONCURRENCY);
     const promises = files.map((file) => limit(() => fnProcessFile(file)));
     const pageMaps = await Promise.all(promises);
 
@@ -294,9 +249,40 @@ export class ReportsService {
 
   async generateReportFinancialStatements() {
     // prep data
-    const outDir = REPORT_CONSTANTS.outputDir;
-    const outputFile = REPORT_CONSTANTS.outputFiles.fs;
-    const categories = REPORT_CONSTANTS.categories;
+    const outDir = CONSTANTS.OUTPUT_DIR;
+    const outputFile = CONSTANTS.OUTPUT_FILES.fs;
+    const categories = {
+      'Income Statement': {
+        Revenues: ['Sales Revenue'],
+        Expenses: [
+          'Cost of Goods Sold',
+          'Salaries Expense',
+          'Rent Expense',
+          'Utilities Expense',
+          'Interest Expense',
+          'Tax Expense',
+        ],
+      },
+      'Balance Sheet': {
+        Assets: [
+          'Cash',
+          'Accounts Receivable',
+          'Inventory',
+          'Fixed Assets',
+          'Prepaid Expenses',
+        ],
+        Liabilities: [
+          'Accounts Payable',
+          'Loan Payable',
+          'Sales Tax Payable',
+          'Accrued Liabilities',
+          'Unearned Revenue',
+          'Dividends Payable',
+        ],
+        Equity: ['Common Stock', 'Retained Earnings'],
+      },
+    };
+
     const files = listFiles(outDir)
       .filter((file) => file.endsWith('.csv') && file !== 'fs.csv')
       .map((file) => `${outDir}/${file}`);
@@ -333,7 +319,7 @@ export class ReportsService {
     }
 
     // limit concurrency for file reading/processing
-    const limit = pLimit(REPORT_CONSTANTS.maxConcurrency);
+    const limit = pLimit(CONSTANTS.MAX_CONCURRENCY);
     await Promise.all(
       files.map((file) => limit(() => fnProcessFile(file, balances))),
     );
