@@ -14,6 +14,12 @@ export enum TaskState {
   Idle = 'idle',
 }
 
+export enum TaskKind {
+  GenerateReportAccount = 'generate_report_account',
+  GenerateReportYearly = 'generate_report_yearly',
+  GenerateReportFinancialStatements = 'generate_report_financial_statements',
+}
+
 @Table({ tableName: 'tasks' })
 export class Task extends Model {
   @PrimaryKey
@@ -22,7 +28,7 @@ export class Task extends Model {
   declare id: number;
 
   @Column({ type: DataType.STRING(50), allowNull: false })
-  kind!: string;
+  kind!: TaskKind;
 
   @Column({ type: DataType.STRING(50), allowNull: false })
   state!: TaskState;

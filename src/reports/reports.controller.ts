@@ -1,5 +1,6 @@
 import { Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { ReportsService } from './reports.service';
+import { TaskKind } from 'db/models/Task';
 
 @Controller('api/v1/reports')
 export class ReportsController {
@@ -14,10 +15,10 @@ export class ReportsController {
   @HttpCode(201)
   async generate() {
     await Promise.all([
-      this.reportsService.enqueueReportTask('generate_report_account'),
-      this.reportsService.enqueueReportTask('generate_report_yearly'),
+      this.reportsService.enqueueReportTask(TaskKind.GenerateReportAccount),
+      this.reportsService.enqueueReportTask(TaskKind.GenerateReportYearly),
       this.reportsService.enqueueReportTask(
-        'generate_report_financial_statements',
+        TaskKind.GenerateReportFinancialStatements,
       ),
     ]);
     return { message: 'finished' };

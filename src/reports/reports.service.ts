@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';
 import { Queue } from 'bullmq';
-import { Task, TaskState } from '../../db/models/Task';
+import { Task, TaskState, TaskKind } from '../../db/models/Task';
 
 const REPORT_CONSTANTS = {
   maxConcurrency: 20,
@@ -58,25 +58,28 @@ export class ReportsService {
     private queueReportFinancialStatements: Queue,
   ) {}
 
-  async enqueueReportTask(taskKind: string, delay = 0): Promise<number> {
+  async enqueueReportTask(taskKind: TaskKind, delay = 0): Promise<number> {
     // create task record
-    const task = await Task.create({ kind: taskKind, state: 'pending' });
+    const task = await Task.create({
+      kind: taskKind,
+      state: TaskState.Pending,
+    });
     const payload = { taskId: task.id };
     const opts = delay > 0 ? { delay } : {};
 
     // enqueue task
     switch (taskKind) {
-      case 'generate_report_account':
+      case TaskKind.GenerateReportAccount:
         await this.queueReportAccounts.add(taskKind, payload, opts);
         break;
-      case 'generate_report_yearly':
+      case TaskKind.GenerateReportYearly:
         await this.queueReportYearly.add(taskKind, payload, opts);
         break;
-      case 'generate_report_financial_statements':
+      case TaskKind.GenerateReportFinancialStatements:
         await this.queueReportFinancialStatements.add(taskKind, payload, opts);
         break;
       default:
-        throw new Error(`Unknown task kind: ${taskKind}`);
+        throw new Error('Unknown task kind: ' + String(taskKind));
     }
 
     return task.id;
@@ -100,17 +103,17 @@ export class ReportsService {
 
     const t0 = performance.now();
     switch (task.kind) {
-      case 'generate_report_account':
+      case TaskKind.GenerateReportAccount:
         await this.generateReportAccounts();
         break;
-      case 'generate_report_yearly':
+      case TaskKind.GenerateReportYearly:
         await this.generateReportYearly();
         break;
-      case 'generate_report_financial_statements':
+      case TaskKind.GenerateReportFinancialStatements:
         await this.generateReportFinancialStatements();
         break;
       default:
-        throw new Error(`Unknown task kind: ${task.kind}`);
+        throw new Error('Unknown task kind: ' + String(task.kind));
     }
 
     task.state = TaskState.Done;
@@ -124,9 +127,9 @@ export class ReportsService {
 
   async getReportStates() {
     const kinds = [
-      'generate_report_account',
-      'generate_report_yearly',
-      'generate_report_financial_statements',
+      TaskKind.GenerateReportAccount,
+      TaskKind.GenerateReportYearly,
+      TaskKind.GenerateReportFinancialStatements,
     ];
 
     // fetch latest task for each kind
@@ -159,9 +162,9 @@ export class ReportsService {
 
     // return states ;
     return {
-      'accounts.csv': states['generate_report_account'],
-      'yearly.csv': states['generate_report_yearly'],
-      'fs.csv': states['generate_report_financial_statements'],
+      'accounts.csv': states[TaskKind.GenerateReportAccount],
+      'yearly.csv': states[TaskKind.GenerateReportYearly],
+      'fs.csv': states[TaskKind.GenerateReportFinancialStatements],
     };
   }
 
