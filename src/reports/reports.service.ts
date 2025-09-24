@@ -1,8 +1,9 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { listFiles, readFilesAsync, writeFile } from '../lib/fshelper';
 import { Injectable } from '@nestjs/common';
-
 import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';
+import { Queue } from 'bullmq';
 
 const REPORT_CONSTANTS = {
   maxConcurrency: 20,
@@ -52,6 +53,15 @@ export class ReportsService {
     yearly: 'idle',
     fs: 'idle',
   };
+
+  constructor(
+    @InjectQueue('task_generate_report_accounts')
+    private queueReportAccounts: Queue,
+    @InjectQueue('task_generate_report_yearly')
+    private queueReportYearly: Queue,
+    @InjectQueue('task_generate_report_financial_statements')
+    private queueReportFinancialStatements: Queue,
+  ) {}
 
   state(scope: keyof typeof this.states): string {
     return this.states[scope];
