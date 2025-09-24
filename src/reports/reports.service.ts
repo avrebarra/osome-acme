@@ -1,5 +1,5 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { listFiles, readFilesAsync, writeFile } from '../lib/fshelper';
+import { listFiles, readFilesAsync, writeFile } from '../helpers/fshelper';
 import { Injectable } from '@nestjs/common';
 import pLimit from 'p-limit';
 import { performance } from 'perf_hooks';

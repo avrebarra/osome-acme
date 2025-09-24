@@ -9,7 +9,7 @@ jest.mock('../lib/fshelper', () => ({
   writeFile: jest.fn(),
 }));
 
-import { listFiles, readFilesAsync, writeFile } from '../lib/fshelper';
+import { listFiles, readFilesAsync, writeFile } from '../helpers/fshelper';
 
 describe('ReportsService', () => {
   let service: ReportsService;
