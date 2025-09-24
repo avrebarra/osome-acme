@@ -68,4 +68,52 @@ describe('ReportsService', () => {
       );
     });
   });
+
+  describe('generateReportYearly', () => {
+    it('should aggregate cash by year and write output', async () => {
+      // arrange
+      (listFiles as jest.Mock).mockReturnValue([
+        '2020.csv',
+        '2021.csv',
+        '2022.csv',
+      ]);
+      (readFilesAsync as jest.Mock).mockImplementation((files: string[]) => {
+        if (files[0].includes('2020.csv')) {
+          return [
+            [
+              '2020-01-15,Cash,,500,0',
+              '2020-06-20,Cash,,0,100',
+              '2020-12-31,Inventory,,200,0', // Should be ignored (not Cash)
+            ],
+          ];
+        }
+        if (files[0].includes('2021.csv')) {
+          return [
+            [
+              '2021-03-10,Cash,,300,0',
+              '2021-09-15,Cash,,0,50',
+              '2021-11-20,Sales Revenue,,0,200', // Should be ignored (not Cash)
+            ],
+          ];
+        }
+        if (files[0].includes('2022.csv')) {
+          return [['2022-01-01,Cash,,100,0', '2022-12-25,Cash,,50,25']];
+        }
+        return [[]];
+      });
+
+      // act
+      await service.generateReportYearly();
+
+      // assert
+      const expectedOutput = [
+        'Financial Year,Cash Balance',
+        '2020,400.00',
+        '2021,250.00',
+        '2022,125.00',
+      ];
+      expect(service.state('yearly')).toMatch(/finished in/);
+      expect(writeFile).toHaveBeenCalledWith('out/yearly.csv', expectedOutput);
+    });
+  });
 });
